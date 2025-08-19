@@ -1,21 +1,23 @@
 # Usamos Python 3.12 para wheels precompilados de pandas/numpy
 FROM python:3.12-slim
 
+# Mejoras de runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ONLY_BINARY=:all:      
+    
 
 WORKDIR /app
 
-# Instalar deps del sistema (mejor compatibilidad con wheels y openpyxl)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copiamos requirements primero para cache de capas
+# Copiamos requirements primero para cache
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Instalar dependencias Python
+RUN python -V && pip -V && \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt
 
 # Copiamos el resto del proyecto
 COPY . .
