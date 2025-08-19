@@ -1,4 +1,3 @@
-# main.py
 import os
 import logging
 from typing import Optional, List
@@ -17,7 +16,6 @@ logger = logging.getLogger("api")
 def get_origins_from_env() -> List[str]:
     raw = os.getenv("FRONT_ORIGINS", "")
     origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
-    # fallback seguro para dev si no hay nada seteado
     return origins or ["http://localhost:5173"]
 
 app = FastAPI(title="API Cambios de Ingeniería")
@@ -37,7 +35,6 @@ def health():
 @app.post("/upload-tareas")
 async def upload_tareas(file: UploadFile = File(...)):
     logger.info("📤 Archivo recibido: %s", file.filename)
-    # Nota: si tu procesador necesita bytes, usar: contenido = await file.read()
     tareas = procesar_excel(file)
     logger.info("🗂️ Tareas procesadas: %d", len(tareas))
 
@@ -52,7 +49,6 @@ async def upload_tareas(file: UploadFile = File(...)):
         "tareas_cargadas": tareas_cargadas,
     }
 
-# Valida order_dir y fechas con pattern (Pydantic v2)
 @app.get("/tareas-filtradas")
 def obtener_tareas(
     response: Response,

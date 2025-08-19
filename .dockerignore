@@ -5,16 +5,14 @@ __pycache__/
 *.db
 *.sqlite3
 
-# Entornos/IDE
 .vscode/
 .idea/
 
-# Git y build
 .git
 .gitignore
-Dockerfile
+
 docker-compose.yml
 
-# Archivos locales/sensibles
+# Nunca subas tu .env en producción
 .env
 *.xlsx
