@@ -1,6 +1,7 @@
 # main.py
 import os
-from typing import Optional
+import logging
+from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -10,11 +11,20 @@ from services.supabase_service import insertar_tareas, filtrar_tareas, obtener_f
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("api")
+
+def get_origins_from_env() -> List[str]:
+    raw = os.getenv("FRONT_ORIGINS", "")
+    origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+    # fallback seguro para dev si no hay nada seteado
+    return origins or ["http://localhost:5173"]
+
 app = FastAPI(title="API Cambios de Ingeniería")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ⚠️ En prod: poné tu dominio (p.ej. ["https://app.tudominio.com"])
+    allow_origins=get_origins_from_env(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,21 +36,23 @@ def health():
 
 @app.post("/upload-tareas")
 async def upload_tareas(file: UploadFile = File(...)):
-    print("📤 Archivo recibido:", file.filename)
+    logger.info("📤 Archivo recibido: %s", file.filename)
+    # Nota: si tu procesador necesita bytes, usar: contenido = await file.read()
     tareas = procesar_excel(file)
-    print(f"🗂️ Tareas procesadas: {len(tareas)}")
+    logger.info("🗂️ Tareas procesadas: %d", len(tareas))
 
     insertadas, actualizadas = insertar_tareas(tareas)
-    tareas_cargadas = (insertadas or 0) + (actualizadas or 0)  # 👈 suma para el front
+    tareas_cargadas = (insertadas or 0) + (actualizadas or 0)
 
     return {
         "status": "ok",
         "procesadas": len(tareas),
         "insertadas": insertadas,
         "actualizadas": actualizadas,
-        "tareas_cargadas": tareas_cargadas,  # 👈 clave que espera el front
+        "tareas_cargadas": tareas_cargadas,
     }
 
+# Valida order_dir y fechas con pattern (Pydantic v2)
 @app.get("/tareas-filtradas")
 def obtener_tareas(
     response: Response,
@@ -48,19 +60,19 @@ def obtener_tareas(
     prioridad: Optional[str] = Query(None, description="CSV"),
     colaborador: Optional[str] = Query(None, description="CSV"),
     tablero: Optional[str] = Query(None),
-    desde: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_creacion >=)"),
-    hasta: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_creacion <=)"),
+    desde: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_creacion >=)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    hasta: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_creacion <=)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
     q: Optional[str] = Query(None, description="busca en nombre/descripcion"),
     order_by: str = Query("fecha_creacion"),
-    order_dir: str = Query("desc", regex="^(asc|desc)$"),
+    order_dir: str = Query("desc", pattern=r"^(asc|desc)$"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     # extras
-    vencida: Optional[bool] = Query(None),  # ⚠️ si tu tabla no tiene 'vencida', lo ignora el servicio
-    vencimiento_desde: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_vencimiento >=)"),
-    vencimiento_hasta: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_vencimiento <=)"),
-    finalizacion_desde: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_finalizacion >=)"),
-    finalizacion_hasta: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_finalizacion <=)"),
+    vencida: Optional[bool] = Query(None),
+    vencimiento_desde: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_vencimiento >=)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    vencimiento_hasta: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_vencimiento <=)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    finalizacion_desde: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_finalizacion >=)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    finalizacion_hasta: Optional[str] = Query(None, description="YYYY-MM-DD (fecha_finalizacion <=)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
 ):
     data, total = filtrar_tareas(
         estado=estado,
